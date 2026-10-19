@@ -62,6 +62,26 @@ If every condition scores perfectly, the test can't show a difference, whatever 
 
 That is a statement about my tasks and not about the orchestrator. Every prompt I wrote was precise and self-contained, and the problems I actually hit in daily work come from loose requests, an existing repo with its own habits, and requirements that move, none of which these tasks recreate. Repo conventions, work that gets lazy halfway, and front-end work are the three I care about most, and the benchmark never exercised them, so I can't say anything about them.
 
+## A harder scenario, and what a work graph did
+
+Since every earlier test saturated, I built one that wouldn't: a roughly twenty-file helpdesk back end and a sixteen-requirement ticket written the way a real one is, with an escalation reason that has to stay hidden from customers in five different places a ticket is shown, two of which are reached only through older code, plus quiet-hours and clock-pause rules the ticket doesn't define. Plain Sonnet averaged 0.92 over three runs (0.86 to 0.97), at about $2.50 and eleven minutes a run, so there was finally something to improve on, about a tenth.
+
+I tried four ways of improving it, each three runs, each judged against a margin I fixed before running anything (a mean at least 0.05 higher, with two of three runs above plain Sonnet's mean).
+
+| Method | Mean | Runs | Mean cost |
+| --- | --- | --- | --- |
+| Plain Sonnet | 0.92 | 0.94, 0.97, 0.86 | $2.50 |
+| Build, one fresh reviewer, then a fix pass | 0.93 | 0.82, 0.98, 0.97 | $3.46 |
+| A work graph the agent fills in and must clear | 0.91 | 0.86, 0.88, 0.98 | $2.63 |
+| One self-review pass | 0.86 | 0.88, 0.85, 0.86 | $2.30 |
+| A flat checklist file | about 0.80 | 0.54, 0.88, 0.75 | $2.33 |
+
+None of them cleared the margin, and the spread between single runs, 0.75 to 0.98, was bigger than any gap between the means. The checklist's first run was dragged down by a bug in my own scorer, so treat its 0.80 as rough.
+
+"But you said a graph was the next step?" It was my hunch, and this tests one small form of it, so it doesn't settle the question. The graph was a script that records requirements, the changes that implement them, the tests that verify them and any problems noticed, with one command listing what's still unverified that the agent must clear before finishing. The agents used it properly, eight to thirteen calls each, around twenty requirements, changes and tests recorded, but none of them recorded a single problem, so it worked as bookkeeping and never made the agent notice something new. What the runs missed was edge-case judgement, an override with a whitespace-only reason went through in every run I checked, and a requirement graph is built to catch forgotten requirements, which weren't the problem here.
+
+The reviewer variant is the one I'd watch. Two of its runs scored among the highest I recorded (0.98 and 0.97) and one among the lowest (0.82), the reviews were real, but the fix pass acted on every serious finding including a stale holiday list in code the task never touched, which is churn you didn't ask for, and it cost between 90 cents and $1.20 here against 3 to 15 cents on the smaller task I'd first tried it on. Limiting the reviewer to the change being made is the obvious adjustment, and I haven't tested it.
+
 ## Reviewers are the cheap win
 
 I then tested the review step on its own, handing a reviewer code with known defects and counting what it found. Three reviewers (the project's Sonnet reviewer agent, the same agent on Opus, and plain Sonnet with a generic prompt) read three codebases, 15 runs in all. Every one caught every known serious bug, including a real one a Sonnet agent had written, where a refused fee was silently dropped. The Sonnet reviewer agent was also the cheapest and fastest, between 13 and 23 cents and about one to two minutes a run, plain Sonnet cost roughly one and a half to two and a half times that, and Opus roughly two to four times, with more findings that were harder to trust (one claim, that the README's test command fails, didn't reproduce when I ran it).
@@ -74,12 +94,14 @@ So finding the bug isn't where the process fails. A fresh Sonnet reviewer finds 
 
 If you build a benchmark, plan on this, because every time I trusted a result I hadn't read, I was wrong. The Opus judge scored the orchestrator low three times for reasons that were mine: it truncated files at 6,000 characters, so long test files looked cut off, it scored files that agents had correctly written outside the project, and it only saw files the model had written, not edited, so it gave a false 2 out of 5 for "missing" files. The orchestrator's first score on the library scenario was 0.72 because my function finder rejected its perfectly good signature; on the harder version the finder picked a helper that returned a day count; and one self-review run lost points because I handed the wrong date to a parameter called `returned_on`. I fixed each one, scored again, and wrote a test that proved the fix by failing without it, which is how I found my first attempt at one of those tests passed with the bug still in place.
 
+Two more of mine, from the harder scenario. Two runs stopped by my weekly usage limit lasted two seconds each, cost nothing, and my runner scored them as 0.3 because it only recognised the word "session", so look at cost and duration before you look at a score. And my reviewer condition was scored on the last message alone, the fix pass's summary, which never repeated the choices the build made, so it lost a tenth of its score for how it reported, not for what it built; I re-scored it from a saved copy of the project, and my runner now saves one for every run.
+
 Worth knowing, too, if you run agents headless. A usage limit stops a run halfway and leaves junk unless your runner exits without recording it, a loop that silently rejects every argument still prints "completed", and a background wait ceiling of 600 seconds will cut an orchestrator off while its reviewer is still working. Check the first line of output before you trust a finish message.
 
 ## What I'd do, and what's next
 
 Pin models and effort in the agent files, because it's free and it works. Add one fresh Sonnet reviewer pass for anything that touches money, data or a public interface, and tell the builder to fix only the serious findings and say so if it disagrees. Skip the orchestrator unless your own tasks are loose and large enough that planning and splitting would earn their cost, and test that on your own work first, since mine couldn't.
 
-What I haven't done is the interesting part. I want tasks that aren't saturated, vague requests in a repo with real conventions, and I want to try a graph of the work itself, units, dependencies, open findings, so an agent can see what's stuck. That's a hunch and not a result, so I'll hold off claiming anything until I've measured it.
+What I haven't done is the interesting part. The harder scenario showed plain Sonnet near 0.92 with real misses, but still on a task I wrote down in full, and I haven't tested the things that hurt me day to day, a long session that carries decisions across several tickets, or front-end work, so I can't say whether a graph or a reviewer helps there. A graph that holds findings and decisions across sessions is still a hunch and not a result, so I'll hold off claiming anything until I've measured it.
 
 Give it a week, look at the split, and move one job down a tier. Good luck, and if your numbers come out different to mine, I'd like to hear about it.
